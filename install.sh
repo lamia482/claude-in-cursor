@@ -67,6 +67,52 @@ detect_linux_distro() {
   echo "unknown"
 }
 
+# 按发行版 / ID_LIKE / 可用包管理器选择安装路径（避免未知 RHEL 系误走 nvm）
+detect_linux_install_family() {
+  local id="" id_like=""
+  if [[ -f /etc/os-release ]]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    id="${ID:-}"
+    id_like="${ID_LIKE:-}"
+  fi
+
+  case "$id" in
+    ubuntu|debian|linuxmint|pop) echo "debian"; return ;;
+    fedora|rhel|centos|rocky|almalinux|ol|euleros|openeuler|kylin|uos|anolis) echo "rhel"; return ;;
+    alpine) echo "alpine"; return ;;
+    arch|manjaro) echo "arch"; return ;;
+  esac
+
+  if [[ "$id_like" == *debian* || "$id_like" == *ubuntu* ]]; then
+    echo "debian"
+    return
+  fi
+  if [[ "$id_like" == *rhel* || "$id_like" == *fedora* || "$id_like" == *centos* ]]; then
+    echo "rhel"
+    return
+  fi
+
+  if command_exists dnf || command_exists yum; then
+    echo "rhel"
+    return
+  fi
+  if command_exists apt-get; then
+    echo "debian"
+    return
+  fi
+  if command_exists apk; then
+    echo "alpine"
+    return
+  fi
+  if command_exists pacman; then
+    echo "arch"
+    return
+  fi
+
+  echo "unknown"
+}
+
 install_homebrew_if_missing() {
   if command_exists brew; then
     return 0
@@ -92,13 +138,25 @@ install_node_via_nvm() {
 
   if [[ ! -s "$NVM_DIR/nvm.sh" ]]; then
     log_info "通过 nvm 安装 Node.js ${MIN_NODE_MAJOR}+..."
-    curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+    if ! curl -fsSL --connect-timeout 30 --max-time 180 \
+      https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash; then
+      log_err "nvm 安装失败（无法访问 GitHub，常见于内网/防火墙环境）"
+      log_err "请手动安装 Node.js >= ${MIN_NODE_MAJOR} 后重新运行: node setup.js"
+      log_err "  - 官方二进制: https://nodejs.org/dist/latest-v20.x/"
+      log_err "  - RHEL/EulerOS: curl -fsSL https://rpm.nodesource.com/setup_20.x | bash - && yum install -y nodejs"
+      log_err "  - 或使用系统/内网 yum 源: yum install -y nodejs npm"
+      exit 1
+    fi
   fi
 
   # shellcheck disable=SC1091
   . "$NVM_DIR/nvm.sh"
 
-  nvm install --lts
+  if ! nvm install --lts; then
+    log_err "nvm 下载 Node.js 失败（网络超时或无法访问 nodejs.org）"
+    log_err "请手动安装 Node.js >= ${MIN_NODE_MAJOR} 后重新运行: node setup.js"
+    exit 1
+  fi
   nvm use --lts
 
   if ! command_exists node; then
@@ -171,20 +229,25 @@ install_git_linux_rhel() {
 }
 
 install_node_linux() {
-  local distro
+  local distro family
   distro="$(detect_linux_distro)"
-  case "$distro" in
-    ubuntu|debian|linuxmint|pop)
+  family="$(detect_linux_install_family)"
+
+  case "$family" in
+    debian)
       install_node_linux_debian
       ;;
-    fedora|rhel|centos|rocky|almalinux|ol)
+    rhel)
+      if [[ "$distro" != "fedora" && "$distro" != "rhel" && "$distro" != "centos" ]]; then
+        log_info "检测到 RHEL 系发行版 (${distro})，使用 yum/dnf 安装 Node.js..."
+      fi
       install_node_linux_rhel
       ;;
     alpine)
       log_info "通过 apk 安装 Node.js、npm 与 Git..."
       run_sudo apk add --no-cache nodejs npm git
       ;;
-    arch|manjaro)
+    arch)
       log_info "通过 pacman 安装 Node.js、npm 与 Git..."
       run_sudo pacman -Sy --noconfirm nodejs npm git
       ;;
@@ -203,19 +266,19 @@ install_git_linux() {
     return 0
   fi
 
-  local distro
-  distro="$(detect_linux_distro)"
-  case "$distro" in
-    ubuntu|debian|linuxmint|pop)
+  local family
+  family="$(detect_linux_install_family)"
+  case "$family" in
+    debian)
       install_git_linux_debian
       ;;
-    fedora|rhel|centos|rocky|almalinux|ol)
+    rhel)
       install_git_linux_rhel
       ;;
     alpine)
       run_sudo apk add --no-cache git
       ;;
-    arch|manjaro)
+    arch)
       run_sudo pacman -Sy --noconfirm git
       ;;
     *)
