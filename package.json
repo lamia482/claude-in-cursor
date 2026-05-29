@@ -1,0 +1,21 @@
+{
+  "name": "claude-in-cursor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cross-platform setup for Claude Code + cc-switch + DeepSeek",
+  "bin": {
+    "claude-setup": "./setup.js",
+    "claude-purge": "./purge.js",
+    "claude-update": "./update.js",
+    "claude-change": "./change.js"
+  },
+  "scripts": {
+    "setup": "node setup.js",
+    "purge": "node purge.js",
+    "update": "node update.js",
+    "change": "node change.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

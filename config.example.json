@@ -1,0 +1,16 @@
+{
+  "provider": "deepseek",
+  "baseUrl": "https://api.deepseek.com/anthropic",
+  "model": "deepseek-v4-pro[1m]",
+  "opusModel": "deepseek-v4-pro[1m]",
+  "sonnetModel": "deepseek-v4-pro[1m]",
+  "haikuModel": "deepseek-v4-flash",
+  "subagentModel": "deepseek-v4-flash",
+  "effortLevel": "max",
+  "profileId": "deepseek",
+  "profileName": "DeepSeek",
+  "profileDescription": "DeepSeek Anthropic-compatible API",
+  "profileIcon": "🐋",
+  "apiKeyEnv": ["DEEPSEEK_API_KEY", "ANTHROPIC_AUTH_TOKEN"],
+  "npmRegistries": ["default", "https://registry.npmmirror.com"]
+}
