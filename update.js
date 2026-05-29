@@ -28,7 +28,7 @@ async function refreshConfig(config) {
 
   log('\n🔄 刷新 provider 配置...', 'blue');
   writeProviderConfig(apiKey, config);
-  ccswitch.use(config.profileId);
+  await ccswitch.use(config.profileId);
   return true;
 }
 
@@ -61,6 +61,6 @@ async function refreshConfig(config) {
     }
   }
 
-  verifySetup(config);
+  await verifySetup(config);
   log('\n✅ 升级完成！\n', 'green');
 })();

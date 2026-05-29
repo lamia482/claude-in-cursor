@@ -18,7 +18,7 @@ function parseArgs(argv) {
   }
 
   if (args.profileId) {
-    ccswitch.use(args.profileId);
+    await ccswitch.use(args.profileId);
     log('');
     ccswitch.current();
     return;
@@ -37,5 +37,5 @@ function parseArgs(argv) {
     return;
   }
 
-  ccswitch.use(null, { interactive: true });
+  await ccswitch.use(null, { interactive: true });
 })();
