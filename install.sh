@@ -6,6 +6,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 MIN_NODE_MAJOR=18
+# 官方二进制包版本（LTS）；用于 NodeSource 不支持的 RHEL 系发行版（如 EulerOS）
+NODE_BINARY_VERSION="${NODE_BINARY_VERSION:-20.19.2}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -113,6 +115,78 @@ detect_linux_install_family() {
   echo "unknown"
 }
 
+detect_node_binary_platform() {
+  case "$(uname -m)" in
+    x86_64) echo "linux-x64" ;;
+    aarch64|arm64) echo "linux-arm64" ;;
+    *)
+      log_err "不支持的 CPU 架构: $(uname -m)，请手动安装 Node.js >= ${MIN_NODE_MAJOR}"
+      exit 1
+      ;;
+  esac
+}
+
+# NodeSource RPM 脚本仅识别 /etc/redhat-release、Amazon Linux、openEuler 等
+nodesource_rpm_supported() {
+  [[ -f /etc/redhat-release ]] && return 0
+  [[ -f /etc/openEuler-release ]] && return 0
+  grep -q "Amazon Linux" /etc/system-release 2>/dev/null && return 0
+  return 1
+}
+
+install_node_via_binary() {
+  local platform version tarball tmpdir url downloaded=0
+
+  platform="$(detect_node_binary_platform)"
+  version="$NODE_BINARY_VERSION"
+  tarball="node-v${version}-${platform}.tar.xz"
+  tmpdir="$(mktemp -d)"
+
+  log_info "通过官方二进制包安装 Node.js v${version} (${platform})..."
+
+  if command_exists dnf || command_exists yum; then
+    local pkg_mgr="dnf"
+    command_exists dnf || pkg_mgr="yum"
+    run_sudo "$pkg_mgr" install -y curl tar xz
+  elif command_exists apt-get; then
+    run_sudo apt-get install -y curl tar xz-utils
+  fi
+
+  local urls=(
+    "https://nodejs.org/dist/v${version}/${tarball}"
+    "https://npmmirror.com/mirrors/node/v${version}/${tarball}"
+  )
+
+  for url in "${urls[@]}"; do
+    log_info "尝试下载: ${url}"
+    if curl -fsSL --connect-timeout 30 --max-time 600 -o "$tmpdir/$tarball" "$url"; then
+      downloaded=1
+      break
+    fi
+    log_warn "下载失败，尝试下一个源..."
+  done
+
+  if [[ "$downloaded" -ne 1 ]]; then
+    rm -rf "$tmpdir"
+    log_err "无法下载 Node.js 二进制包（请检查网络或手动安装）"
+    log_err "  https://nodejs.org/dist/v${version}/${tarball}"
+    exit 1
+  fi
+
+  run_sudo tar -xJf "$tmpdir/$tarball" -C /usr/local --strip-components=1
+  rm -rf "$tmpdir"
+
+  export PATH="/usr/local/bin:$PATH"
+  hash -r 2>/dev/null || true
+
+  if ! command_exists node || [[ "$(node_major_version)" -lt $MIN_NODE_MAJOR ]]; then
+    log_err "二进制包安装后 Node.js 仍不可用"
+    exit 1
+  fi
+
+  log_ok "✓ Node.js $(node -v | sed 's/^v//') 已通过二进制包安装到 /usr/local"
+}
+
 install_homebrew_if_missing() {
   if command_exists brew; then
     return 0
@@ -210,9 +284,26 @@ install_node_linux_rhel() {
     run_sudo "$pkg_mgr" install -y curl git
 
     if ! command_exists node || [[ "$(node_major_version)" -lt $MIN_NODE_MAJOR ]]; then
-      log_info "系统源 Node 版本过低，改用 NodeSource 安装 Node.js 20..."
-      curl -fsSL https://rpm.nodesource.com/setup_20.x | run_sudo bash -
-      run_sudo "$pkg_mgr" install -y nodejs
+      if nodesource_rpm_supported; then
+        log_info "系统源 Node 版本过低，改用 NodeSource 安装 Node.js 20..."
+        if curl -fsSL --connect-timeout 30 --max-time 180 \
+          https://rpm.nodesource.com/setup_20.x | run_sudo bash - \
+          && run_sudo "$pkg_mgr" install -y nodejs; then
+          :
+        else
+          log_warn "NodeSource 安装失败，改用官方二进制包..."
+          install_node_via_binary
+        fi
+      else
+        local distro
+        distro="$(detect_linux_distro)"
+        log_warn "当前发行版 (${distro}) 不受 NodeSource RPM 脚本支持，改用官方二进制包..."
+        if command_exists node && [[ "$(node_major_version)" -lt $MIN_NODE_MAJOR ]]; then
+          log_warn "移除系统旧版 nodejs 包，避免 PATH 冲突..."
+          run_sudo "$pkg_mgr" remove -y nodejs npm 2>/dev/null || true
+        fi
+        install_node_via_binary
+      fi
     fi
     return 0
   fi
@@ -343,6 +434,8 @@ ensure_git() {
 }
 
 main() {
+  export PATH="/usr/local/bin:$PATH"
+
   log_info ""
   log_info "========================================"
   log_info "  claude-in-cursor 环境检测与一键部署"
