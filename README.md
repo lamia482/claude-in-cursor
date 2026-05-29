@@ -2,24 +2,26 @@
 
 跨平台（Linux / macOS / Windows，x64 / ARM）一键部署 **Claude Code** + **cc-switch** + **DeepSeek**（或其他 Anthropic 兼容 API）的脚本工具集。
 
-使用 Node.js 脚本自动检测环境、安装依赖、写入配置，尽量少依赖图形界面操作。
+macOS / Linux 推荐使用 `install.sh` 自动检测并安装 Node.js、Git 等依赖后完成部署；Windows 或已具备 Node.js 环境的用户可直接运行 Node.js 脚本。
 
 ## 功能
 
 | 脚本 | 用途 |
 |------|------|
+| `install.sh` | **推荐入口**（macOS / Linux）：检测并安装 Node.js / Git，然后执行部署 |
 | `setup.js` | 首次部署：安装 Claude Code、cc-switch，配置 DeepSeek API |
 | `update.js` | 升级 Claude Code、cc-switch，并刷新配置文件 |
 | `purge.js` | 按需卸载工具或清理配置（交互式菜单） |
 | `change.js` | 交互式切换模型；`--list` 查看配置，`profileId` 直接切换 |
+| `proxy.js` | 启动本地兼容代理（通常由 `change.js` / `ccs use` 自动拉起） |
 
 ## 前置要求
 
-- **Node.js** >= 18（含 npm）
-- **Git**（Windows 必需；macOS/Linux 建议安装）
+- **Node.js** >= 18（含 npm）— macOS / Linux 可由 `install.sh` 自动安装
+- **Git**（Windows 必需；macOS/Linux 建议安装，可由 `install.sh` 自动安装）
 - 对应 API 的 Key（默认 DeepSeek）
 
-脚本会自动检测以上环境，缺失时给出安装提示。
+`install.sh` 或 `setup.js` 会自动检测以上环境，缺失时给出安装提示或尝试自动安装。
 
 ## 快速开始
 
@@ -27,11 +29,14 @@
 # 克隆或进入项目目录
 cd claude-in-cursor
 
-# 方式一：交互式（会提示输入 API Key）
-node setup.js
+# macOS / Linux（推荐）：自动安装依赖并部署
+bash install.sh
 
-# 方式二：非交互式（推荐）
+# 非交互式（推荐）：先导出 API Key，再执行安装
 export DEEPSEEK_API_KEY=sk-xxx
+bash install.sh
+
+# Windows 或已具备 Node.js >= 18 的环境，可直接部署
 node setup.js
 
 # 验证
@@ -52,19 +57,35 @@ cp config.example.json config.json
 
 ## 安全使用
 
-- **推荐**：先 `export DEEPSEEK_API_KEY=...`，再运行 `node setup.js`，避免 `KEY=xxx node setup.js` 进入 shell 历史
+- **推荐**：先 `export DEEPSEEK_API_KEY=...`，再运行 `bash install.sh`（或 `node setup.js`），避免 `KEY=xxx bash install.sh` 进入 shell 历史
 - **禁止**：不要把 Key 写入 `config.json`（含 `apiKey`、`token`、`secret` 等字段会被拒绝）
 - **交互输入**：已启用掩码（输入不可见），但在 IDE 终端日志或共享屏幕场景仍可能泄露，慎用
 - **本地文件**：Key 以明文存于 `~/.claude/settings.json` 与 `profiles/*.json`，脚本写入后自动 `chmod 600`
 - **备份清理**：cc-switch 切换时会在 `~/.claude/cc-switch-backups/` 留存含 token 的备份，需手动执行 `node purge.js` 选项 `[6]` 或 `node purge.js --backups --yes`
 - **泄露后**：在提供商控制台轮换 Key，然后 `export DEEPSEEK_API_KEY=新Key && node update.js --config-only`
 
-## 四个脚本详解
+## 脚本详解
+
+### install.sh — 一键安装与部署（macOS / Linux）
+
+```bash
+bash install.sh
+```
+
+执行流程：
+
+1. 检测系统平台与架构（`darwin/arm64`、`linux/x86_64` 等）
+2. 若缺失或版本过低，自动安装 **Node.js** >= 18 与 **npm**（Homebrew / apt / dnf / nvm 等）
+3. 若缺失，自动安装 **Git**
+4. 调用 `node setup.js` 完成 Claude Code、cc-switch 安装与 API 配置
+
+> **Windows** 不支持 `install.sh`，请确保已安装 Node.js >= 18 与 Git 后，直接运行 `node setup.js`。
 
 ### setup.js — 部署
 
 ```bash
-node setup.js
+bash install.sh    # macOS / Linux 推荐
+node setup.js      # Windows 或已具备 Node.js 环境
 # 或
 npm run setup
 ```
@@ -78,7 +99,7 @@ npm run setup
 5. 读取 `config.json`（或内置默认值）
 6. 获取 API Key（环境变量优先，缺失则掩码交互输入）
 7. 写入 `~/.claude/settings.json` 与 `~/.claude/profiles/<profileId>.json`
-8. 通过 `ccs use <profileId>` 激活配置
+8. 通过 `ccs use <profileId>` 激活配置，并按需启动兼容代理
 
 **API Key 环境变量**（按优先级）：
 
@@ -149,14 +170,20 @@ node change.js --list         # 仅查看当前配置与 profile 列表
 {
   "provider": "deepseek",
   "baseUrl": "https://api.deepseek.com/anthropic",
+  "useProxy": true,
+  "proxyPort": 19876,
+  "proxyListenHost": "127.0.0.1",
   "model": "deepseek-v4-pro[1m]",
   "opusModel": "deepseek-v4-pro[1m]",
   "sonnetModel": "deepseek-v4-pro[1m]",
   "haikuModel": "deepseek-v4-flash",
   "subagentModel": "deepseek-v4-flash",
   "effortLevel": "max",
+  "claudeModelTier": "opus",
   "profileId": "deepseek",
   "profileName": "DeepSeek",
+  "profileDescription": "DeepSeek Anthropic-compatible API",
+  "profileIcon": "🐋",
   "apiKeyEnv": ["DEEPSEEK_API_KEY", "ANTHROPIC_AUTH_TOKEN"],
   "npmRegistries": ["default", "https://registry.npmmirror.com"]
 }
@@ -165,10 +192,13 @@ node change.js --list         # 仅查看当前配置与 profile 列表
 | 字段 | 说明 |
 |------|------|
 | `baseUrl` | Anthropic 兼容 API 地址 |
+| `useProxy` / `proxyPort` / `proxyListenHost` | 是否启用本地兼容代理及监听地址 |
 | `model` / `opusModel` / `sonnetModel` / `haikuModel` | 各档位模型 |
 | `subagentModel` | 子代理模型 |
 | `effortLevel` | Claude Code 努力程度 |
+| `claudeModelTier` | Claude Code 默认模型档位 |
 | `profileId` / `profileName` | cc-switch profile 标识与显示名 |
+| `profileDescription` / `profileIcon` | profile 描述与图标 |
 | `apiKeyEnv` | 读取 API Key 的环境变量列表 |
 | `npmRegistries` | npm 安装源列表，按顺序尝试；`default` 表示 npm 当前默认源 |
 
@@ -192,8 +222,10 @@ node change.js --list         # 仅查看当前配置与 profile 列表
 
 ```
 claude-in-cursor/
-├── lib/                 # 公共模块（平台检测、安装、配置写入等）
-├── setup.js             # 部署入口
+├── lib/                 # 公共模块（平台检测、安装、配置写入、代理等）
+├── install.sh           # 一键安装入口（macOS / Linux）
+├── setup.js             # 部署入口（由 install.sh 调用）
+├── proxy.js             # 兼容代理入口
 ├── purge.js             # 卸载入口
 ├── update.js            # 升级入口
 ├── change.js            # 切换入口
@@ -207,18 +239,22 @@ claude-in-cursor/
 
 ```mermaid
 flowchart LR
-  setup[setup.js] --> lib[lib/]
+  install[install.sh] --> setup[setup.js]
+  setup --> lib[lib/]
   purge[purge.js] --> lib
   update[update.js] --> lib
   change[change.js] --> lib
+  proxy[proxy.js] --> lib
   lib --> claudeDir["~/.claude/"]
   config[config.json] --> lib
 ```
 
 ## 跨平台说明
 
-- 全部使用 **Node.js 脚本**，无需为 Linux/Windows/macOS 或 AMD/ARM 编写独立 shell/bat
-- 通过 `npm install -g` 安装 Claude Code 与 cc-switch，npm 自动处理架构差异
+- **macOS / Linux**：运行 `bash install.sh`，自动安装 Node.js / Git 后执行部署
+- **Windows**：`install.sh` 不可用，请手动安装 Node.js >= 18 与 Git，再运行 `node setup.js`
+- 部署逻辑统一由 **Node.js 脚本** 完成，npm 自动处理 AMD/ARM 架构差异
+- 通过 `npm install -g` 安装 Claude Code 与 cc-switch
 - Windows 安装后若命令找不到，检查 `%APPDATA%\npm` 是否在 PATH 中
 - macOS/Linux 可执行 `npm bin -g` 查看全局 bin 路径
 
