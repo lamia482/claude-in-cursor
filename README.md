@@ -9,8 +9,8 @@ macOS / Linux 推荐使用 `install.sh` 自动检测并安装 Node.js、Git 等�
 | 脚本 | 用途 |
 |------|------|
 | `install.sh` | **推荐入口**（macOS / Linux）：检测并安装 Node.js / Git，然后执行部署 |
-| `setup.js` | 首次部署：安装 Claude Code、cc-switch，配置 DeepSeek API |
-| `update.js` | 升级 Claude Code、cc-switch，并刷新配置文件 |
+| `setup.js` | 首次部署：安装 Claude Code、cc-switch、Claude skills，配置 DeepSeek API |
+| `update.js` | 升级 Claude Code、cc-switch、skills，并刷新配置文件 |
 | `purge.js` | 按需卸载工具或清理配置（交互式菜单） |
 | `change.js` | 交互式切换模型；`--list` 查看配置，`profileId` 直接切换 |
 | `proxy.js` | 启动本地兼容代理（通常由 `change.js` / `ccs use` 自动拉起） |
@@ -18,7 +18,7 @@ macOS / Linux 推荐使用 `install.sh` 自动检测并安装 Node.js、Git 等�
 ## 前置要求
 
 - **Node.js** >= 18（含 npm）— macOS / Linux 可由 `install.sh` 自动安装
-- **Git**（Windows 必需；macOS/Linux 建议安装，可由 `install.sh` 自动安装）
+- **Git**（Windows 必需；安装 `skill.yaml` 中的 skills 时 macOS/Linux 也必需，可由 `install.sh` 自动安装）
 - 对应 API 的 Key（默认 DeepSeek）
 
 `install.sh` 或 `setup.js` 会自动检测以上环境，缺失时给出安装提示或尝试自动安装。
@@ -77,7 +77,7 @@ bash install.sh
 1. 检测系统平台与架构（`darwin/arm64`、`linux/x86_64` 等）
 2. 若缺失或版本过低，自动安装 **Node.js** >= 18 与 **npm**（Homebrew / apt / dnf / nvm 等）
 3. 若缺失，自动安装 **Git**
-4. 调用 `node setup.js` 完成 Claude Code、cc-switch 安装与 API 配置
+4. 调用 `node setup.js` 完成 Claude Code、cc-switch 安装、skills 同步与 API 配置
 
 > **Windows** 不支持 `install.sh`，请确保已安装 Node.js >= 18 与 Git 后，直接运行 `node setup.js`。
 
@@ -96,10 +96,11 @@ npm run setup
 2. 检查 Node.js、npm、Git
 3. 全局安装 `@anthropic-ai/claude-code`（npm，失败时自动切换备用源）
 4. 全局安装 `@supertiny99/cc-switch`（同上）
-5. 读取 `config.json`（或内置默认值）
-6. 获取 API Key（环境变量优先，缺失则掩码交互输入）
-7. 写入 `~/.claude/settings.json` 与 `~/.claude/profiles/<profileId>.json`
-8. 通过 `ccs use <profileId>` 激活配置，并按需启动兼容代理
+5. 按 `skill.yaml` 将 Claude skills clone 到 `~/.claude/skills/`（HTTPS 优先，失败回退 SSH；已存在则跳过）
+6. 读取 `config.json`（或内置默认值）
+7. 获取 API Key（环境变量优先，缺失则掩码交互输入）
+8. 写入 `~/.claude/settings.json` 与 `~/.claude/profiles/<profileId>.json`
+9. 通过 `ccs use <profileId>` 激活配置，并按需启动兼容代理
 
 **API Key 环境变量**（按优先级）：
 
@@ -116,6 +117,7 @@ npm run update
 
 - 升级 `@anthropic-ai/claude-code@latest`
 - 升级 `@supertiny99/cc-switch@latest`
+- 同步 `skill.yaml` 中的 Claude skills（pull 或 clone 缺失项）
 - 若存在 `config.json` 且 API Key 可用，重新写入 settings 与 profile
 
 可选参数：
@@ -124,6 +126,9 @@ npm run update
 |------|------|
 | `--claude-only` | 仅升级 Claude Code |
 | `--ccs-only` | 仅升级 cc-switch |
+| `--skills-only` | 仅同步 skills |
+| `--local` | 扫描 `~/.claude/skills`，合并并写回 `skill.yaml`，再同步 skills |
+| `--local --skills-only` | 仅本地合并 + skills 同步，不升级 claude/cc-switch |
 | `--config-only` | 仅刷新配置，不升级包 |
 
 ### purge.js — 卸载
@@ -161,6 +166,29 @@ node change.js --list         # 仅查看当前配置与 profile 列表
 ```
 
 底层调用 cc-switch 的 `ccs current`、`ccs list`、`ccs use`。
+
+### skill.yaml — Claude skills 清单
+
+项目根目录的 `skill.yaml` 定义要安装到 `~/.claude/skills/` 的 skill 仓库：
+
+```yaml
+skills:
+  - name: gpt-image2-ppt-skills
+    url: https://github.com/JuneYaooo/gpt-image2-ppt-skills.git
+  - name: image-to-editable-ppt-skill
+    url: https://github.com/ningzimu/image-to-editable-ppt-skill.git
+```
+
+| 字段 | 说明 |
+|------|------|
+| `name` | 目标目录名（`~/.claude/skills/{name}`） |
+| `url` | HTTPS 仓库地址（clone 优先使用，pull 失败时回退 SSH） |
+| `ssh_url` | 可选，显式 SSH 回退地址 |
+| `branch` | 可选，默认 `main` |
+
+- `setup.js` / `install.sh`：clone 缺失的 skill（已存在则跳过）
+- `node update.js`：pull 已有 skill，clone 缺失项
+- `node update.js --local`：扫描本机 `~/.claude/skills/`，将本地 git skill 追加写入 `skill.yaml`（无 `.git` 的目录跳过并警告），再同步
 
 ## 配置文件说明
 
@@ -215,6 +243,7 @@ node change.js --list         # 仅查看当前配置与 profile 列表
 ├── settings.json              # Claude Code 当前环境变量配置
 ├── profiles/
 │   └── deepseek.json          # cc-switch profile（可多个）
+├── skills/                    # Claude skills（由 skill.yaml 管理）
 └── cc-switch-backups/         # cc-switch 自动备份
 ```
 
@@ -229,6 +258,7 @@ claude-in-cursor/
 ├── purge.js             # 卸载入口
 ├── update.js            # 升级入口
 ├── change.js            # 切换入口
+├── skill.yaml           # Claude skills 清单
 ├── config.example.json  # 配置模板
 ├── config.json          # 本地配置（gitignore）
 ├── package.json

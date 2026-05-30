@@ -6,6 +6,7 @@ const { loadConfig, hasUserConfig } = require('./lib/config');
 const { checkNode, checkNpm } = require('./lib/checks');
 const claude = require('./lib/claude');
 const ccswitch = require('./lib/ccswitch');
+const skills = require('./lib/skills');
 const { writeProviderConfig } = require('./lib/settings');
 const { resolveApiKeyFromEnv } = require('./lib/apikey');
 const { verifySetup } = require('./lib/verify');
@@ -15,6 +16,8 @@ function parseArgs(argv) {
     claudeOnly: argv.includes('--claude-only'),
     ccsOnly: argv.includes('--ccs-only'),
     configOnly: argv.includes('--config-only'),
+    skillsOnly: argv.includes('--skills-only'),
+    local: argv.includes('--local'),
   };
 }
 
@@ -45,15 +48,29 @@ async function refreshConfig(config) {
   log('========================================\n', 'blue');
 
   if (!args.configOnly) {
+    if (args.local) {
+      const mergeResult = skills.syncLocalToManifest();
+      log(
+        `本地合并: 新增 ${mergeResult.added.length}，已有 ${mergeResult.unchanged.length}，跳过 ${mergeResult.skipped.length}`,
+        'blue',
+      );
+    }
+
     const results = [];
-    if (!args.ccsOnly) results.push(claude.upgrade());
-    if (!args.claudeOnly) results.push(ccswitch.upgrade());
+    if (args.skillsOnly || args.local) {
+      results.push(skills.upgrade());
+    } else {
+      if (!args.ccsOnly) results.push(claude.upgrade());
+      if (!args.claudeOnly) results.push(ccswitch.upgrade());
+      if (!args.claudeOnly && !args.ccsOnly) results.push(skills.upgrade());
+    }
     if (results.length > 0 && results.every(result => result.skipped)) {
       log('\n无需升级，所有组件均已是最新版本', 'green');
     }
   }
 
-  if (!args.claudeOnly && !args.ccsOnly) {
+  const skipConfigRefresh = args.claudeOnly || args.ccsOnly || args.skillsOnly;
+  if (!skipConfigRefresh) {
     if (hasUserConfig() || args.configOnly) {
       await refreshConfig(config);
     } else {

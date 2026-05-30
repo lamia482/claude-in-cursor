@@ -6,6 +6,7 @@ const { loadConfig } = require('./lib/config');
 const { checkNode, checkNpm, checkGit, requireGitOnWindows } = require('./lib/checks');
 const claude = require('./lib/claude');
 const ccswitch = require('./lib/ccswitch');
+const skills = require('./lib/skills');
 const { writeProviderConfig } = require('./lib/settings');
 const { resolveApiKey } = require('./lib/apikey');
 const { verifySetup } = require('./lib/verify');
@@ -30,9 +31,14 @@ async function configureProvider(config) {
   log('========================================\n', 'blue');
 
   requireGitOnWindows(gitOk);
+  if (skills.loadSkillManifest().length > 0 && !gitOk) {
+    log('✗ 安装 skills 需要 Git，请先安装 Git 后重试', 'red');
+    process.exit(1);
+  }
 
   claude.install();
   ccswitch.install();
+  skills.install();
   await configureProvider(config);
   await verifySetup(config);
 

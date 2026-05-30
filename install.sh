@@ -452,7 +452,7 @@ main() {
   ensure_git
 
   log_info ""
-  log_info "开始执行 node setup.js ..."
+  log_info "开始执行 node setup.js（含 skill.yaml skills 同步）..."
   log_info ""
 
   exec node setup.js
