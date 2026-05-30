@@ -96,7 +96,7 @@ npm run setup
 2. 检查 Node.js、npm、Git
 3. 全局安装 `@anthropic-ai/claude-code`（npm，失败时自动切换备用源）
 4. 全局安装 `@supertiny99/cc-switch`（同上）
-5. 按 `skill.yaml` 将 Claude skills clone 到 `~/.claude/skills/`（HTTPS 优先，失败回退 SSH；已存在则跳过）
+5. 按 `skill.yaml` 将 skills clone 到 `~/.agents/skills/`（已存在则 fetch/pull），并软链接到 `~/.claude/skills`、`~/.cursor/skills`、`~/.codex/skills`
 6. 读取 `config.json`（或内置默认值）
 7. 获取 API Key（环境变量优先，缺失则掩码交互输入）
 8. 写入 `~/.claude/settings.json` 与 `~/.claude/profiles/<profileId>.json`
@@ -117,7 +117,7 @@ npm run update
 
 - 升级 `@anthropic-ai/claude-code@latest`
 - 升级 `@supertiny99/cc-switch@latest`
-- 同步 `skill.yaml` 中的 Claude skills（pull 或 clone 缺失项）
+- 同步 `skill.yaml` 中的 skills（更新 `~/.agents/skills` 并刷新各 IDE 软链接）
 - 若存在 `config.json` 且 API Key 可用，重新写入 settings 与 profile
 
 可选参数：
@@ -127,7 +127,7 @@ npm run update
 | `--claude-only` | 仅升级 Claude Code |
 | `--ccs-only` | 仅升级 cc-switch |
 | `--skills-only` | 仅同步 skills |
-| `--local` | 扫描 `~/.claude/skills`，合并并写回 `skill.yaml`，再同步 skills |
+| `--local` | 扫描本地 skills 目录，合并并写回 `skill.yaml`，再同步 `~/.agents/skills` |
 | `--local --skills-only` | 仅本地合并 + skills 同步，不升级 claude/cc-switch |
 | `--config-only` | 仅刷新配置，不升级包 |
 
@@ -169,7 +169,16 @@ node change.js --list         # 仅查看当前配置与 profile 列表
 
 ### skill.yaml — Claude skills 清单
 
-项目根目录的 `skill.yaml` 定义要安装到 `~/.claude/skills/` 的 skill 仓库：
+项目根目录的 `skill.yaml` 定义要安装的技能仓库。实际 git 仓库位于 `~/.agents/skills/`，**每个 skill 单独软链接**到各 IDE：
+
+```
+~/.agents/skills/{name}/          # 实际 git 仓库（clone / fetch / pull）
+~/.claude/skills/{name}  →  ~/.agents/skills/{name}
+~/.cursor/skills/{name}  →  ~/.agents/skills/{name}
+~/.codex/skills/{name}   →  ~/.agents/skills/{name}
+```
+
+若 `~/.agents/skills` 或各 IDE 的 `skills/` 目录本身是 symlink，首次同步时会自动 materialize 为实际目录，再逐 skill 建链。
 
 ```yaml
 skills:
@@ -181,14 +190,14 @@ skills:
 
 | 字段 | 说明 |
 |------|------|
-| `name` | 目标目录名（`~/.claude/skills/{name}`） |
+| `name` | 目标目录名（`~/.agents/skills/{name}`） |
 | `url` | HTTPS 仓库地址（clone 优先使用，pull 失败时回退 SSH） |
 | `ssh_url` | 可选，显式 SSH 回退地址 |
 | `branch` | 可选，默认 `main` |
 
-- `setup.js` / `install.sh`：clone 缺失的 skill（已存在则跳过）
-- `node update.js`：pull 已有 skill，clone 缺失项
-- `node update.js --local`：扫描本机 `~/.claude/skills/`，将本地 git skill 追加写入 `skill.yaml`（无 `.git` 的目录跳过并警告），再同步
+- `setup.js` / `install.sh`：clone 到 `~/.agents/skills`（已存在则 fetch/pull），并创建软链接
+- `node update.js`：更新 `~/.agents/skills` 并刷新软链接
+- `node update.js --local`：扫描本机 skills 目录，将本地 git skill 追加写入 `skill.yaml`（无 `.git` 的目录跳过并警告），再同步
 
 ## 配置文件说明
 
@@ -239,12 +248,16 @@ skills:
 ## 生成的文件位置
 
 ```
+~/.agents/
+└── skills/                    # 实际 skill 仓库（由 skill.yaml 管理）
 ~/.claude/
 ├── settings.json              # Claude Code 当前环境变量配置
 ├── profiles/
 │   └── deepseek.json          # cc-switch profile（可多个）
-├── skills/                    # Claude skills（由 skill.yaml 管理）
+├── skills/                    # → ~/.agents/skills（软链接）
 └── cc-switch-backups/         # cc-switch 自动备份
+~/.cursor/skills/              # → ~/.agents/skills（软链接）
+~/.codex/skills/               # → ~/.agents/skills（软链接）
 ```
 
 ## 项目结构
