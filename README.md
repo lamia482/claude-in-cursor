@@ -169,16 +169,28 @@ node change.js --list         # 仅查看当前配置与 profile 列表
 
 ### skill.yaml — Claude skills 清单
 
-项目根目录的 `skill.yaml` 定义要安装的技能仓库。实际 git 仓库位于 `~/.agents/skills/`，**每个 skill 单独软链接**到各 IDE：
+项目根目录的 `skill.yaml` 定义要安装的技能仓库。Git 操作在 `~/.agents/skills` 指向的实际目录中执行（允许 `~/.agents/skills` 本身为 symlink，例如指向 `~/workspace/insight/skills`）。
+
+同步时通过 **realpath** 比对四个目录下同名 skill 是否为同一目录。支持两种 IDE 布局：
+
+**方式 A — 目录级软链接（推荐，可与其他 IDE 共用）：**
 
 ```
-~/.agents/skills/{name}/          # 实际 git 仓库（clone / fetch / pull）
+~/.claude/skills  →  ~/.agents/skills
+~/.cursor/skills  →  ~/.agents/skills
+~/.codex/skills   →  ~/.agents/skills
+```
+
+**方式 B — 逐 skill 软链接**（当 IDE 的 `skills/` 为独立目录时）：
+
+```
 ~/.claude/skills/{name}  →  ~/.agents/skills/{name}
-~/.cursor/skills/{name}  →  ~/.agents/skills/{name}
-~/.codex/skills/{name}   →  ~/.agents/skills/{name}
 ```
 
-若 `~/.agents/skills` 或各 IDE 的 `skills/` 目录本身是 symlink，首次同步时会自动 materialize 为实际目录，再逐 skill 建链。
+- `~/.agents/skills` 本身可为 symlink（例如指向 `~/workspace/insight/skills`）
+- 若 IDE 的 `skills/` 已是 `~/.agents/skills` 的软链接，或解析到同一目录，则跳过逐 skill 建链
+- 若同名 skill 解析路径不一致，以 `~/.agents/skills/{name}` 为准替换为软链接
+- 缺失的 IDE `skills/` 目录会默认创建指向 `~/.agents/skills` 的目录软链接
 
 ```yaml
 skills:
@@ -195,8 +207,8 @@ skills:
 | `ssh_url` | 可选，显式 SSH 回退地址 |
 | `branch` | 可选，默认 `main` |
 
-- `setup.js` / `install.sh`：clone 到 `~/.agents/skills`（已存在则 fetch/pull），并创建软链接
-- `node update.js`：更新 `~/.agents/skills` 并刷新软链接
+- `setup.js` / `install.sh`：clone 到 `~/.agents/skills`（已存在则 fetch/pull），并校验各 IDE 目录下同名 skill 是否与 agents 为同一目录；不一致则以 agents 为准替换为软链接
+- `node update.js`：更新 `~/.agents/skills` 并执行上述校验与链接
 - `node update.js --local`：扫描本机 skills 目录，将本地 git skill 追加写入 `skill.yaml`（无 `.git` 的目录跳过并警告），再同步
 
 ## 配置文件说明
