@@ -5,3 +5,6 @@ skills:
     url: https://github.com/ningzimu/image-to-editable-ppt-skill.git
   - name: patent-disclosure-skill
     url: https://github.com/handsomestWei/patent-disclosure-skill.git
+  - name: superpowers
+    url: https://github.com/obra/superpowers.git
+    ssh_url: git@github.com:obra/superpowers.git
