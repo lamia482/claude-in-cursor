@@ -5,6 +5,7 @@ const { loadConfig } = require('./lib/config');
 const claude = require('./lib/claude');
 const ccswitch = require('./lib/ccswitch');
 const { removeProfile, purgeEnv, purgeBackups } = require('./lib/settings');
+const { purgeAcademicSearchMcp } = require('./lib/mcp');
 const { askChoice, askConfirm } = require('./lib/prompt');
 
 const MENU_OPTIONS = [
@@ -14,6 +15,7 @@ const MENU_OPTIONS = [
   { id: '4', label: '清除 settings.json 中的 provider env 变量', action: 'env' },
   { id: '5', label: '全部执行 (1+2+3+4)', action: 'all' },
   { id: '6', label: '清理 cc-switch 备份（可能含 token）', action: 'backups' },
+  { id: '7', label: '移除 academic-search MCP 配置', action: 'mcp-academic-search' },
   { id: '0', label: '取消', action: 'cancel' },
 ];
 
@@ -23,6 +25,7 @@ const ACTION_LABELS = {
   profile: '移除本工具创建的 profile',
   env: '清除 settings.json 中的 provider env 变量',
   backups: '清理 cc-switch 备份（可能含 token）',
+  'mcp-academic-search': '移除 academic-search MCP 配置',
 };
 
 function parseArgs(argv) {
@@ -30,6 +33,7 @@ function parseArgs(argv) {
     tools: argv.includes('--tools'),
     config: argv.includes('--config'),
     backups: argv.includes('--backups'),
+    mcpAcademicSearch: argv.includes('--mcp-academic-search'),
     all: argv.includes('--all'),
     yes: argv.includes('--yes'),
   };
@@ -40,6 +44,7 @@ function actionsFromFlag(args) {
   if (args.tools) return ['claude', 'ccs'];
   if (args.config) return ['profile', 'env'];
   if (args.backups) return ['backups'];
+  if (args.mcpAcademicSearch) return ['mcp-academic-search'];
   return null;
 }
 
@@ -71,6 +76,9 @@ async function runActions(actions, config) {
         break;
       case 'backups':
         purgeBackups();
+        break;
+      case 'mcp-academic-search':
+        purgeAcademicSearchMcp();
         break;
       default:
         break;

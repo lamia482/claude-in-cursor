@@ -7,6 +7,8 @@ const { checkNode, checkNpm } = require('./lib/checks');
 const claude = require('./lib/claude');
 const ccswitch = require('./lib/ccswitch');
 const skills = require('./lib/skills');
+const { ensureMcpLayout } = require('./lib/agents-layout');
+const { configureNatureMcp } = require('./lib/mcp');
 const { writeProviderConfig } = require('./lib/settings');
 const { resolveApiKeyFromEnv } = require('./lib/apikey');
 const { verifySetup } = require('./lib/verify');
@@ -18,6 +20,7 @@ function parseArgs(argv) {
     configOnly: argv.includes('--config-only'),
     skillsOnly: argv.includes('--skills-only'),
     local: argv.includes('--local'),
+    skipMcp: argv.includes('--skip-mcp'),
   };
 }
 
@@ -66,6 +69,11 @@ async function refreshConfig(config) {
     }
     if (results.length > 0 && results.every(result => result.skipped)) {
       log('\n无需升级，所有组件均已是最新版本', 'green');
+    }
+
+    if (!args.skipMcp && !args.configOnly) {
+      ensureMcpLayout();
+      await configureNatureMcp(config, { interactive: false });
     }
   }
 

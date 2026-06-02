@@ -16,5 +16,7 @@
   "profileDescription": "DeepSeek Anthropic-compatible API",
   "profileIcon": "🐋",
   "apiKeyEnv": ["DEEPSEEK_API_KEY", "ANTHROPIC_AUTH_TOKEN"],
-  "npmRegistries": ["default", "https://registry.npmmirror.com"]
+  "npmRegistries": ["default", "https://registry.npmmirror.com"],
+  "pubmedEmail": "",
+  "natureMcp": true
 }

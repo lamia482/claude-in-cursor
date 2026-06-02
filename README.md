@@ -127,6 +127,7 @@ npm run update
 | `--claude-only` | 仅升级 Claude Code |
 | `--ccs-only` | 仅升级 cc-switch |
 | `--skills-only` | 仅同步 skills |
+| `--skip-mcp` | 跳过 MCP 配置（无 Python 环境或 CI 时使用） |
 | `--local` | 扫描本地 skills 目录，合并并写回 `skill.yaml`，再同步 `~/.agents/skills` |
 | `--local --skills-only` | 仅本地合并 + skills 同步，不升级 claude/cc-switch |
 | `--config-only` | 仅刷新配置，不升级包 |
@@ -141,6 +142,7 @@ node purge.js --backups     # 仅清理 cc-switch 备份（含 token）
 node purge.js --all         # 清理工具与配置 (1+2+3+4)，不含备份
 node purge.js --all --yes   # 全部清理，跳过确认
 node purge.js --backups --yes  # 清理备份，跳过确认
+node purge.js --mcp-academic-search --yes  # 移除 academic-search MCP
 ```
 
 交互菜单：
@@ -152,6 +154,7 @@ node purge.js --backups --yes  # 清理备份，跳过确认
 [4] 清除 settings.json 中的 provider env 变量
 [5] 全部执行 (1+2+3+4)
 [6] 清理 cc-switch 备份（可能含 token）
+[7] 移除 academic-search MCP 配置
 [0] 取消
 ```
 
@@ -166,6 +169,21 @@ node change.js --list         # 仅查看当前配置与 profile 列表
 ```
 
 底层调用 cc-switch 的 `ccs current`、`ccs list`、`ccs use`。
+
+### ~/.agents 统一架构
+
+Agent 共享资源统一存放在 `~/.agents/`，Claude / Cursor / Codex 对应路径通过软链接指向同一 canonical 源：
+
+| 链接路径（IDE 侧） | 指向（canonical） |
+|---|---|
+| `~/.claude/skills` | `~/.agents/skills` |
+| `~/.cursor/skills` | `~/.agents/skills` |
+| `~/.codex/skills` | `~/.agents/skills` |
+| `~/.claude/.mcp.json` | `~/.agents/mcp.json` |
+| `~/.cursor/mcp.json` | `~/.agents/mcp.json` |
+| `~/.codex/mcp.json` | `~/.agents/mcp.json` |
+
+首次 setup 时，若 IDE 侧已有独立 `mcp.json`，会自动合并到 `~/.agents/mcp.json` 后替换为软链接。Claude Code 的 `enabledMcpjsonServers` 仍在 `~/.claude/settings.json`（含 API Key 等私有配置，不可 symlink）。
 
 ### skill.yaml — Claude skills 清单
 
@@ -198,6 +216,8 @@ skills:
     url: https://github.com/JuneYaooo/gpt-image2-ppt-skills.git
   - name: image-to-editable-ppt-skill
     url: https://github.com/ningzimu/image-to-editable-ppt-skill.git
+  - name: nature-skills
+    url: https://github.com/Yuan1z0825/nature-skills.git
 ```
 
 | 字段 | 说明 |
@@ -210,6 +230,38 @@ skills:
 - `setup.js` / `install.sh`：clone 到 `~/.agents/skills`（已存在则 fetch/pull），并校验各 IDE 目录下同名 skill 是否与 agents 为同一目录；不一致则以 agents 为准替换为软链接
 - `node update.js`：更新 `~/.agents/skills` 并执行上述校验与链接
 - `node update.js --local`：扫描本机 skills 目录，将本地 git skill 追加写入 `skill.yaml`（无 `.git` 的目录跳过并警告），再同步
+
+### nature-skills
+
+[nature-skills](https://github.com/Yuan1z0825/nature-skills) 提供 Nature 期刊风格的学术写作、润色、审稿、科研绘图等 skill，已纳入 `skill.yaml`，整仓 clone 到 `~/.agents/skills/nature-skills/`（monorepo，含 10 个 `nature-*` skill 与 `skills/_shared/`）。
+
+| Skill | 用途 | 触发示例 |
+|---|---|---|
+| nature-polishing | Nature 风格润色 | "Nature style", "polish abstract" |
+| nature-writing | 稿件章节撰写 | "write introduction", "manuscript draft" |
+| nature-figure | 科研绘图 | "Nature figure", "publication plot" |
+| nature-reader | 全文双语 Markdown 阅读 | "nature reader", "全文翻译" |
+| nature-reviewer | 审稿人视角评估 | "pre-submission review" |
+| nature-citation | CNS 引用检索 | "Nature citation", "Zotero RDF" |
+| nature-data | 数据可用性声明 | "Data Availability" |
+| nature-response | 审稿意见回复 | "response to reviewers" |
+| nature-paper2ppt | 论文转中文 PPT | "paper PPT", "journal club" |
+| nature-academic-search | 文献检索 MCP | "search papers", "verify DOI" |
+
+**MCP 配置**（`nature-academic-search`）：setup/update 会自动写入 `~/.agents/mcp.json` 并在 Claude Code 启用 `academic-search`。前置条件：
+
+- `python3` 及 `pip3`
+- 设置 `PUBMED_EMAIL` 环境变量，或在 `config.json` 中配置 `pubmedEmail`
+- 可选：`NCBI_API_KEY` 提高 PubMed 限速
+
+```bash
+export PUBMED_EMAIL=your@email.com
+node update.js --skills-only   # 同步 skill + MCP
+node setup.js --skip-mcp       # 跳过 MCP 配置
+node purge.js --mcp-academic-search --yes  # 移除 MCP 条目
+```
+
+安装后重启 Cursor / Claude Code 使 MCP 生效。与 `gpt-image2-ppt-skills` 不冲突（nature-paper2ppt 偏中文学术组会，gpt-image2 偏视觉生成）。
 
 ## 配置文件说明
 
@@ -234,7 +286,9 @@ skills:
   "profileDescription": "DeepSeek Anthropic-compatible API",
   "profileIcon": "🐋",
   "apiKeyEnv": ["DEEPSEEK_API_KEY", "ANTHROPIC_AUTH_TOKEN"],
-  "npmRegistries": ["default", "https://registry.npmmirror.com"]
+  "npmRegistries": ["default", "https://registry.npmmirror.com"],
+  "pubmedEmail": "",
+  "natureMcp": true
 }
 ```
 
@@ -250,6 +304,8 @@ skills:
 | `profileDescription` / `profileIcon` | profile 描述与图标 |
 | `apiKeyEnv` | 读取 API Key 的环境变量列表 |
 | `npmRegistries` | npm 安装源列表，按顺序尝试；`default` 表示 npm 当前默认源 |
+| `pubmedEmail` | PubMed MCP 联系邮箱（也可用 `PUBMED_EMAIL` 环境变量） |
+| `natureMcp` | 是否在 setup/update 时配置 academic-search MCP，默认 `true` |
 
 默认安装源顺序：`default` → `https://registry.npmmirror.com`。网络差时会自动切换备用源。
 
@@ -261,15 +317,21 @@ skills:
 
 ```
 ~/.agents/
-└── skills/                    # 实际 skill 仓库（由 skill.yaml 管理）
+├── mcp.json                   # MCP 配置（canonical）
+└── skills/                    # skill 仓库（由 skill.yaml 管理）
 ~/.claude/
+├── .mcp.json                  # → ~/.agents/mcp.json（软链接）
 ├── settings.json              # Claude Code 当前环境变量配置
 ├── profiles/
 │   └── deepseek.json          # cc-switch profile（可多个）
 ├── skills/                    # → ~/.agents/skills（软链接）
 └── cc-switch-backups/         # cc-switch 自动备份
-~/.cursor/skills/              # → ~/.agents/skills（软链接）
-~/.codex/skills/               # → ~/.agents/skills（软链接）
+~/.cursor/
+├── mcp.json                   # → ~/.agents/mcp.json（软链接）
+└── skills/                    # → ~/.agents/skills（软链接）
+~/.codex/
+├── mcp.json                   # → ~/.agents/mcp.json（软链接）
+└── skills/                    # → ~/.agents/skills（软链接）
 ```
 
 ## 项目结构
@@ -329,3 +391,4 @@ flowchart LR
 - [Claude Code](https://github.com/anthropics/claude-code)
 - [cc-switch (@supertiny99/cc-switch)](https://www.npmjs.com/package/@supertiny99/cc-switch)
 - [DeepSeek API](https://api.deepseek.com/)
+- [nature-skills](https://github.com/Yuan1z0825/nature-skills)
