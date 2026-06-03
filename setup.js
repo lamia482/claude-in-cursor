@@ -8,6 +8,7 @@ const claude = require('./lib/claude');
 const ccswitch = require('./lib/ccswitch');
 const skills = require('./lib/skills');
 const { ensureMcpLayout } = require('./lib/agents-layout');
+const { ensureRulesLayout, parseForceRulesLink } = require('./lib/rules-layout');
 const { configureNatureMcp } = require('./lib/mcp');
 const { writeProviderConfig } = require('./lib/settings');
 const { resolveApiKey } = require('./lib/apikey');
@@ -22,6 +23,7 @@ async function configureProvider(config) {
 
 (async () => {
   const skipMcp = process.argv.includes('--skip-mcp');
+  const forceRulesLink = parseForceRulesLink(process.argv);
   const config = loadConfig();
 
   log(`检测到系统: ${platform} / ${arch}`, 'blue');
@@ -42,6 +44,7 @@ async function configureProvider(config) {
   claude.install();
   ccswitch.install();
   skills.install();
+  ensureRulesLayout({ force: forceRulesLink });
   if (!skipMcp) {
     ensureMcpLayout();
     await configureNatureMcp(config);

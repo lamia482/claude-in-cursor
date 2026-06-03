@@ -182,8 +182,31 @@ Agent 共享资源统一存放在 `~/.agents/`，Claude / Cursor / Codex 对应�
 | `~/.claude/.mcp.json` | `~/.agents/mcp.json` |
 | `~/.cursor/mcp.json` | `~/.agents/mcp.json` |
 | `~/.codex/mcp.json` | `~/.agents/mcp.json` |
+| `~/.claude/rules` | `~/.agents/rules`（目录） |
+| `~/.claude/CLAUDE.md` | `~/.agents/AGENTS.global.md` |
+| `~/.codex/AGENTS.md` | `~/.agents/AGENTS.global.md` |
+| `{项目}/.cursor/rules/*.mdc` | `~/.agents/rules/*.mdc`（文件软链，由 setup 创建） |
+
+**唯一真源**：skills、rules、MCP 实体文件只存在于 `~/.agents/`；`setup.js` / `update.js` 仅创建软链接，不把规则复制到各 IDE 目录（首次缺失时从 `lib/rules-seed/` 写入 `~/.agents` 一次，之后不覆盖）。
 
 首次 setup 时，若 IDE 侧已有独立 `mcp.json`，会自动合并到 `~/.agents/mcp.json` 后替换为软链接。Claude Code 的 `enabledMcpjsonServers` 仍在 `~/.claude/settings.json`（含 API Key 等私有配置，不可 symlink）。
+
+**Cursor 说明**：无全局 `~/.cursor/rules`；项目内通过 `.cursor/rules/` 软链到 `~/.agents/rules/`。Cursor Settings → User Rules 无法文件软链，可选填一行：`全局规则见 ~/.agents/rules/`。
+
+### 全局 rules（`~/.agents/rules/`）
+
+| 文件 | 用途 |
+|------|------|
+| `document-skills.mdc` | 论文/专利/软著/基金/PPT/体系文档 → 选用 skill 并先读 `SKILL.md` |
+| `pathology-ml.mdc` | 病理 CV/DL/ML（`.py` / notebook）；含 `globs` 与 `paths` |
+
+```bash
+node setup.js                  # 种子 + 全局/项目软链 + Codex fallback
+node update.js                 # 刷新软链（不覆盖已存在的 ~/.agents/rules 内容）
+node setup.js --force-rules-link   # 强制将冲突路径替换为软链接
+```
+
+验证：`readlink ~/.claude/rules` 应指向 `~/.agents/rules`；`readlink .cursor/rules/document-skills.mdc` 应指向 `~/.agents/rules/document-skills.mdc`。
 
 ### skill.yaml — Claude skills 清单
 
@@ -218,7 +241,30 @@ skills:
     url: https://github.com/ningzimu/image-to-editable-ppt-skill.git
   - name: nature-skills
     url: https://github.com/Yuan1z0825/nature-skills.git
+  - name: patent-disclosure-skill
+    url: https://github.com/handsomestWei/patent-disclosure-skill.git
+  - name: SoftwareCopyright-Skill
+    url: https://github.com/Fokkyp/SoftwareCopyright-Skill.git
+  - name: nsfc-agent-skills
+    url: https://github.com/njzjz/nsfc-agent-skills.git
+  - name: designdoc
+    url: https://github.com/reddishz/designdoc.git
 ```
+
+### 已安装 skills 用途速查
+
+| 用途 | `skill.yaml` name | 仓库 |
+|------|-------------------|------|
+| 写论文（Nature 系列） | `nature-skills` | [Yuan1z0825/nature-skills](https://github.com/Yuan1z0825/nature-skills) |
+| 写专利 / 交底书 | `patent-disclosure-skill` | [handsomestWei/patent-disclosure-skill](https://github.com/handsomestWei/patent-disclosure-skill) |
+| 写软著 | `SoftwareCopyright-Skill` | [Fokkyp/SoftwareCopyright-Skill](https://github.com/Fokkyp/SoftwareCopyright-Skill) |
+| 写 NSFC 申请书 | `nsfc-agent-skills` | [njzjz/nsfc-agent-skills](https://github.com/njzjz/nsfc-agent-skills) |
+| 标准化技术文档（体系资料） | `designdoc` | [reddishz/designdoc](https://github.com/reddishz/designdoc) |
+| 做 PPT（视觉生成） | `gpt-image2-ppt-skills` | [JuneYaooo/gpt-image2-ppt-skills](https://github.com/JuneYaooo/gpt-image2-ppt-skills) |
+| 图片/PDF 转可编辑 PPT | `image-to-editable-ppt-skill` | [ningzimu/image-to-editable-ppt-skill](https://github.com/ningzimu/image-to-editable-ppt-skill) |
+| 通用开发流程 | `superpowers` | [obra/superpowers](https://github.com/obra/superpowers) |
+
+Agent 选 skill 的细节见全局 rule `~/.agents/rules/document-skills.mdc`。
 
 | 字段 | 说明 |
 |------|------|
@@ -339,6 +385,8 @@ node purge.js --mcp-academic-search --yes  # 移除 MCP 条目
 ```
 claude-in-cursor/
 ├── lib/                 # 公共模块（平台检测、安装、配置写入、代理等）
+│   ├── rules-layout.js  # ~/.agents/rules 种子与软链接
+│   └── rules-seed/      # 首次 bootstrap 用（不复制到 IDE）
 ├── install.sh           # 一键安装入口（macOS / Linux）
 ├── setup.js             # 部署入口（由 install.sh 调用）
 ├── proxy.js             # 兼容代理入口

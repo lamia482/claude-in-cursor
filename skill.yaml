@@ -10,3 +10,11 @@ skills:
     ssh_url: git@github.com:obra/superpowers.git
   - name: nature-skills
     url: https://github.com/Yuan1z0825/nature-skills.git
+  - name: SoftwareCopyright-Skill
+    url: https://github.com/Fokkyp/SoftwareCopyright-Skill.git
+  - name: nsfc-agent-skills
+    url: https://github.com/njzjz/nsfc-agent-skills.git
+    branch: master
+  - name: designdoc
+    url: https://github.com/reddishz/designdoc.git
+    branch: master

@@ -8,6 +8,7 @@ const claude = require('./lib/claude');
 const ccswitch = require('./lib/ccswitch');
 const skills = require('./lib/skills');
 const { ensureMcpLayout } = require('./lib/agents-layout');
+const { ensureRulesLayout, parseForceRulesLink } = require('./lib/rules-layout');
 const { configureNatureMcp } = require('./lib/mcp');
 const { writeProviderConfig } = require('./lib/settings');
 const { resolveApiKeyFromEnv } = require('./lib/apikey');
@@ -40,6 +41,7 @@ async function refreshConfig(config) {
 
 (async () => {
   const args = parseArgs(process.argv.slice(2));
+  const forceRulesLink = parseForceRulesLink(process.argv);
   const config = loadConfig();
 
   log(`检测到系统: ${platform} / ${arch}`, 'blue');
@@ -69,6 +71,10 @@ async function refreshConfig(config) {
     }
     if (results.length > 0 && results.every(result => result.skipped)) {
       log('\n无需升级，所有组件均已是最新版本', 'green');
+    }
+
+    if (!args.configOnly) {
+      ensureRulesLayout({ force: forceRulesLink });
     }
 
     if (!args.skipMcp && !args.configOnly) {
