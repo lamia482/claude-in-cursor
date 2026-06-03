@@ -20,5 +20,6 @@
   "pubmedEmail": "",
   "natureMcp": true,
   "githubMirror": true,
+  "githubMirrorFirst": true,
   "githubMirrorPrefix": "https://ghfast.top/"
 }

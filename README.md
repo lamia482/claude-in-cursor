@@ -273,7 +273,7 @@ Agent 选 skill 的细节见全局 rule `~/.agents/rules/document-skills.mdc`。
 | `ssh_url` | 可选，显式 SSH 回退地址 |
 | `branch` | 可选，默认 `main` |
 
-**GitHub 访问失败时的回退顺序**（仅 `github.com` 仓库）：直连 HTTPS → [ghfast 镜像](https://ghfast.top/)（`https://ghfast.top/https://github.com/...`）→ SSH。镜像 clone/pull 成功后会将 `origin` 设回 `skill.yaml` 中的 canonical HTTPS 地址，便于网络恢复后直连。
+**GitHub clone/pull 顺序**（仅 `github.com` 仓库，默认）：[ghfast 镜像](https://ghfast.top/)（`https://ghfast.top/https://github.com/...`）→ 直连 HTTPS → SSH。镜像成功后会将 `origin` 设回 `skill.yaml` 中的 canonical HTTPS。设 `githubMirrorFirst: false` 可改为先直连、失败再用镜像。
 
 - `setup.js` / `install.sh`：clone 到 `~/.agents/skills`（已存在则 fetch/pull），并校验各 IDE 目录下同名 skill 是否与 agents 为同一目录；不一致则以 agents 为准替换为软链接
 - `node update.js`：更新 `~/.agents/skills` 并执行上述校验与链接
@@ -354,7 +354,8 @@ node purge.js --mcp-academic-search --yes  # 移除 MCP 条目
 | `npmRegistries` | npm 安装源列表，按顺序尝试；`default` 表示 npm 当前默认源 |
 | `pubmedEmail` | PubMed MCP 联系邮箱（也可用 `PUBMED_EMAIL` 环境变量） |
 | `natureMcp` | 是否在 setup/update 时配置 academic-search MCP，默认 `true` |
-| `githubMirror` | 是否在 HTTPS 失败后尝试 GitHub 镜像，默认 `true` |
+| `githubMirror` | 是否启用 GitHub 镜像，默认 `true` |
+| `githubMirrorFirst` | 是否**优先**走镜像（再直连、再 SSH），默认 `true` |
 | `githubMirrorPrefix` | 镜像前缀，默认 `https://ghfast.top/`（与 `https://github.com/...` 拼接为 `https://ghfast.top/https://github.com/...`） |
 
 默认安装源顺序：`default` → `https://registry.npmmirror.com`。网络差时会自动切换备用源。
