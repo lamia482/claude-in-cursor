@@ -18,5 +18,7 @@
   "apiKeyEnv": ["DEEPSEEK_API_KEY", "ANTHROPIC_AUTH_TOKEN"],
   "npmRegistries": ["default", "https://registry.npmmirror.com"],
   "pubmedEmail": "",
-  "natureMcp": true
+  "natureMcp": true,
+  "githubMirror": true,
+  "githubMirrorPrefix": "https://ghfast.top/"
 }
