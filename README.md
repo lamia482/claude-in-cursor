@@ -29,12 +29,16 @@ macOS / Linux 推荐使用 `install.sh` 自动检测并安装 Node.js、Git 等�
 # 克隆或进入项目目录
 cd claude-in-cursor
 
-# macOS / Linux（推荐）：自动安装依赖并部署
+# macOS / Linux（推荐）：自动安装依赖并部署；无 config.json 时会提示选择 API 来源
 bash install.sh
 
-# 非交互式（推荐）：先导出 API Key，再执行安装
+# 非交互式 DeepSeek
 export DEEPSEEK_API_KEY=sk-xxx
-bash install.sh
+node setup.js --provider deepseek
+
+# 非交互式智谱 GLM
+export ZHIPU_API_KEY=xxx
+node setup.js --provider zhipu
 
 # Windows 或已具备 Node.js >= 18 的环境，可直接部署
 node setup.js
@@ -50,19 +54,37 @@ claude   # 启动 Claude Code
 复制示例配置并按需修改：
 
 ```bash
-cp config.example.json config.json
+cp config.example.json config.json        # DeepSeek
+cp config.zhipu.example.json config.json  # 智谱 GLM 5.2
 ```
 
 `config.json` 不会被 git 跟踪。可修改模型名称、API 地址、profile 名称等，后续换用其他模型 API 时只需改此文件。**请勿在 `config.json` 中写入 API Key**（脚本会拒绝 `apiKey` 等敏感字段）。
 
+### 支持的 API 来源
+
+```bash
+node change.js --providers
+# 或
+node change.js --api-sources
+```
+
+当前内置来源：
+
+| provider | 名称 | Base URL | 默认模型 |
+|----------|------|----------|----------|
+| `deepseek` | DeepSeek | `https://api.deepseek.com/anthropic` | `deepseek-v4-pro[1m]` |
+| `zhipu` | Zhipu GLM | `https://open.bigmodel.cn/api/anthropic` | `glm-5.2` |
+
+智谱用于 Claude Code 时应使用 Claude/Anthropic 兼容地址 `https://open.bigmodel.cn/api/anthropic`，不是 OpenAI 兼容的 `paas/v4` 地址。
+
 ## 安全使用
 
-- **推荐**：先 `export DEEPSEEK_API_KEY=...`，再运行 `bash install.sh`（或 `node setup.js`），避免 `KEY=xxx bash install.sh` 进入 shell 历史
+- **推荐**：先 `export DEEPSEEK_API_KEY=...` 或 `export ZHIPU_API_KEY=...`，再运行 `bash install.sh`（或 `node setup.js --provider zhipu`），避免 `KEY=xxx bash install.sh` 进入 shell 历史
 - **禁止**：不要把 Key 写入 `config.json`（含 `apiKey`、`token`、`secret` 等字段会被拒绝）
 - **交互输入**：已启用掩码（输入不可见），但在 IDE 终端日志或共享屏幕场景仍可能泄露，慎用
 - **本地文件**：Key 以明文存于 `~/.claude/settings.json` 与 `profiles/*.json`，脚本写入后自动 `chmod 600`
 - **备份清理**：cc-switch 切换时会在 `~/.claude/cc-switch-backups/` 留存含 token 的备份，需手动执行 `node purge.js` 选项 `[6]` 或 `node purge.js --backups --yes`
-- **泄露后**：在提供商控制台轮换 Key，然后 `export DEEPSEEK_API_KEY=新Key && node update.js --config-only`
+- **泄露后**：在提供商控制台轮换 Key，然后重新导出对应环境变量（如 `DEEPSEEK_API_KEY` / `ZHIPU_API_KEY`）并执行 `node update.js --config-only`
 
 ## 脚本详解
 
@@ -77,7 +99,7 @@ bash install.sh
 1. 检测系统平台与架构（`darwin/arm64`、`linux/x86_64` 等）
 2. 若缺失或版本过低，自动安装 **Node.js** >= 18 与 **npm**（Homebrew / apt / dnf / nvm 等）
 3. 若缺失，自动安装 **Git**
-4. 调用 `node setup.js` 完成 Claude Code、cc-switch 安装、skills 同步与 API 配置
+4. 调用 `node setup.js` 完成 Claude Code、cc-switch 安装、skills 同步与 API 配置；无 `config.json` 时会提示选择 DeepSeek 或 Zhipu GLM
 
 > **Windows** 不支持 `install.sh`，请确保已安装 Node.js >= 18 与 Git 后，直接运行 `node setup.js`。
 
@@ -97,14 +119,15 @@ npm run setup
 3. 全局安装 `@anthropic-ai/claude-code`（npm，失败时自动切换备用源）
 4. 全局安装 `@supertiny99/cc-switch`（同上）
 5. 按 `skill.yaml` 将 skills clone 到 `~/.agents/skills/`（已存在则 fetch/pull），并软链接到 `~/.claude/skills`、`~/.cursor/skills`、`~/.codex/skills`
-6. 读取 `config.json`（或内置默认值）
-7. 获取 API Key（环境变量优先，缺失则掩码交互输入）
+6. 读取 `config.json`（或交互选择内置 API 来源）
+7. 获取 API Key（对应来源的环境变量优先，缺失则掩码交互输入）
 8. 写入 `~/.claude/settings.json` 与 `~/.claude/profiles/<profileId>.json`
 9. 通过 `ccs use <profileId>` 激活配置，并按需启动兼容代理
 
 **API Key 环境变量**（按优先级）：
 
 - `DEEPSEEK_API_KEY`
+- `ZHIPU_API_KEY`
 - `ANTHROPIC_AUTH_TOKEN`
 
 ### update.js — 升级
@@ -165,7 +188,9 @@ node purge.js --mcp-academic-search --yes  # 移除 academic-search MCP
 ```bash
 node change.js                # 交互式选择（默认）
 node change.js deepseek       # 切换到 deepseek profile
+node change.js zhipu          # 切换到 zhipu profile
 node change.js --list         # 仅查看当前配置与 profile 列表
+node change.js --providers    # 查看内置 API 来源
 ```
 
 底层调用 cc-switch 的 `ccs current`、`ccs list`、`ccs use`。
@@ -336,12 +361,26 @@ node purge.js --mcp-academic-search --yes  # 移除 MCP 条目
   "apiKeyEnv": ["DEEPSEEK_API_KEY", "ANTHROPIC_AUTH_TOKEN"],
   "npmRegistries": ["default", "https://registry.npmmirror.com"],
   "pubmedEmail": "",
-  "natureMcp": true
+  "natureMcp": true,
+  "githubMirror": true,
+  "githubMirrorFirst": true,
+  "githubMirrorPrefix": "https://ghfast.top/"
 }
 ```
 
+`config.zhipu.example.json`：
+
+```json
+{
+  "provider": "zhipu"
+}
+```
+
+智谱预设会自动使用 `glm-5.2` 与 `https://open.bigmodel.cn/api/anthropic`。如需覆盖模型或端口，可在 `config.json` 中追加同名字段。
+
 | 字段 | 说明 |
 |------|------|
+| `provider` | 内置 API 来源：`deepseek` 或 `zhipu`；未知值按自定义 Anthropic 兼容 API 处理 |
 | `baseUrl` | Anthropic 兼容 API 地址 |
 | `useProxy` / `proxyPort` / `proxyListenHost` | 是否启用本地兼容代理及监听地址 |
 | `model` / `opusModel` / `sonnetModel` / `haikuModel` | 各档位模型 |

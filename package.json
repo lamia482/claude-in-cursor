@@ -14,7 +14,8 @@
     "proxy": "node proxy.js",
     "purge": "node purge.js",
     "update": "node update.js",
-    "change": "node change.js"
+    "change": "node change.js",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=18"

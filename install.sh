@@ -434,7 +434,10 @@ ensure_git() {
 }
 
 main() {
-  export PATH="/usr/local/bin:$PATH"
+  case ":$PATH:" in
+    *":/usr/local/bin:"*) ;;
+    *) export PATH="$PATH:/usr/local/bin" ;;
+  esac
 
   log_info ""
   log_info "========================================"
