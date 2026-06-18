@@ -376,15 +376,17 @@ node purge.js --mcp-academic-search --yes  # 移除 MCP 条目
 }
 ```
 
-智谱预设会自动使用 `glm-5.2` 与 `https://open.bigmodel.cn/api/anthropic`。如需覆盖模型或端口，可在 `config.json` 中追加同名字段。
+智谱预设会自动使用 `glm-5.2`、`glm-5.2[1M]` Fable 模型别名与 `https://open.bigmodel.cn/api/anthropic`。如需覆盖模型或端口，可在 `config.json` 中追加同名字段。
 
 | 字段 | 说明 |
 |------|------|
 | `provider` | 内置 API 来源：`deepseek` 或 `zhipu`；未知值按自定义 Anthropic 兼容 API 处理 |
 | `baseUrl` | Anthropic 兼容 API 地址 |
 | `useProxy` / `proxyPort` / `proxyListenHost` | 是否启用本地兼容代理及监听地址 |
-| `model` / `opusModel` / `sonnetModel` / `haikuModel` | 各档位模型 |
+| `model` / `fableModel` / `opusModel` / `sonnetModel` / `haikuModel` | 各档位模型 |
+| `modelName` / `fableModelName` / `opusModelName` / `sonnetModelName` / `haikuModelName` | 写入 Claude Code/cc-switch 的模型显示名，主要用于兼容 cc-switch GUI 生成的 provider env |
 | `subagentModel` | 子代理模型 |
+| `enableToolSearch` | 是否写入 `ENABLE_TOOL_SEARCH=true`，默认 `true` |
 | `effortLevel` | Claude Code 努力程度 |
 | `claudeModelTier` | Claude Code 默认模型档位 |
 | `profileId` / `profileName` | cc-switch profile 标识与显示名 |
